@@ -1,0 +1,5 @@
+{
+     "JWT_SECRET":"JSONWEBTOKENSECRET",
+     "DB_PATH": "mongodb://localhost:27017/Oauth2",
+     "JWT_EXPIRE":36000
+}
