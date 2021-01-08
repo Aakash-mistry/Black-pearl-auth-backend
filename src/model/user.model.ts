@@ -8,6 +8,7 @@ type UserTypes = User & Mongoose.Document
 const UserSchema = new Mongoose.Schema({
      email: { type: Mongoose.Schema.Types.String, required: true },
      password: { type: Mongoose.Schema.Types.String, required: true },
+     resetToken: { type: Mongoose.Schema.Types.String, required: false },
 }, {
      timestamps: true
 })

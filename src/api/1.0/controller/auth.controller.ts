@@ -1,6 +1,6 @@
 import { Request, Response } from 'express'
-import { IControllerRoutes, IController } from 'types'
-import { Ok, UnAuthorized } from 'utils'
+import { IControllerRoutes, IController, ResetTokenInfo } from 'types'
+import { BadRequest, Ok, UnAuthorized } from 'utils'
 import { Users } from 'model'
 import bcrypt from 'bcrypt'
 import * as jwt from 'jsonwebtoken'
@@ -31,16 +31,10 @@ export class AuthController implements IController {
           })
 
           this.routes.push({
-               path: '/signout',
-               handler: this.signout,
-               method: 'GET',
+               path: '/change-password',
+               handler: this.changePassword,
+               method: "PUT"
           })
-
-          // this.routes.push({
-          //      path: '/update-password',
-          //      handler: this.updatePassword,
-          //      method: 'PUT'
-          // })
 
      }
 
@@ -52,19 +46,16 @@ export class AuthController implements IController {
                const userExist = await Users.findOne({ email })
 
                if (userExist) {
-                    return UnAuthorized(res, "User is already registered with us!")
+                    return UnAuthorized(res, "The email you are using is already registered with us.")
                }
 
                const hashPassword = bcrypt.hashSync(password, 10)
 
                const token = jwt.sign({
-                    email: email,
-               }, "JSONWEBTOKENSECRET")
+                    email: email
+               }, 'jsonwebtoken', { expiresIn: '900s' })
 
-               const expires = Date.now() + 9999
-               res.cookie(token, { expires })
-
-               const user = await new Users({
+               await new Users({
                     email: email,
                     password: hashPassword
                }).save();
@@ -73,6 +64,7 @@ export class AuthController implements IController {
 
           } catch (err) {
                console.log(err)
+               return err
           }
      }
 
@@ -94,8 +86,8 @@ export class AuthController implements IController {
                }
 
                const token = jwt.sign({
-                    _id: userExist._id,
-               }, "JSONWEBTOKENSECRET")
+                    email: email
+               }, 'jsonwebtoken', { expiresIn: '900s' })
 
                const expires = Date.now() + 9999
                res.cookie(token, { expires })
@@ -105,11 +97,6 @@ export class AuthController implements IController {
           } catch (err) {
                console.log(err)
           }
-     }
-
-     public async signout(req: Request, res: Response) {
-          res.clearCookie("token")
-          return Ok(res, { message: "User signout successfull" })
      }
 
      public async resetPassword(req: Request, res: Response) {
@@ -127,6 +114,8 @@ export class AuthController implements IController {
                email: email
           }, 'jsonwebtoken', { expiresIn: '900s' })
 
+
+          await Users.updateOne({ email }, { $set: { resetToken: token } })
           let transporter = await nodemailer.createTransport({
                host: 'smtp.gmail.com',
                port: 465,
@@ -142,6 +131,7 @@ export class AuthController implements IController {
                text: `Hey, \n \n this is mail from BLACK PEARL AUTHENTICATION you are requested for the reseting password for your app,
                \n \n that's recently noticed... \n http://localhost:3000/new-password?token=${token} \n click on this link and reset your password \n THANK YOU`
           };
+
           transporter.sendMail(mailOptions, (error, info) => {
                if (error) {
                     return console.log(error);
@@ -150,10 +140,41 @@ export class AuthController implements IController {
           });
      }
 
-     // public async updatePassword(req: Request, res: Response) {
-     //      const getToken = req.query.
-     //           jwt.verify(token, 'jsonwebtoken')
-     //      return Ok(res, "Updating password")
-     // }
+     public async changePassword(req: Request, res: Response) {
+          const { password, token } = req.body;
+
+          if (!token) {
+               console.log("token is required")
+               return BadRequest(res, 'Token is required')
+          }
+
+          let decodedToken = null;
+
+          try {
+               decodedToken = jwt.verify(token, "jsonwebtoken") as ResetTokenInfo;
+          } catch (err) {
+               console.log("token is invalid one")
+               return BadRequest(res, 'Token is invalid')
+          }
+
+          if (!decodedToken) {
+               console.log("token is invalid two")
+               return BadRequest(res, 'Token is invalid')
+          }
+
+          const user = await Users.findOne({ resetToken: token });
+
+          if (!user) {
+               return BadRequest(res, 'Token is invalid')
+          }
+
+          await Users.updateOne({ resetToken: token }, {
+               $set: {
+                    password: bcrypt.hashSync(password, 10), resetToken: ''
+               }
+          })
+          return Ok(res, "your password have been changed, now login and try your account")
+
+     }
 
 }
