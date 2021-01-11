@@ -1,7 +1,7 @@
 import { Request, Response } from 'express'
 import { IControllerRoutes, IController, ResetTokenInfo } from 'types'
-import { BadRequest, Ok, UnAuthorized } from 'utils'
-import { Users } from 'model'
+import { BadRequest, NotFound, Ok, UnAuthorized } from 'utils'
+import { CallbackModel, Users } from 'model'
 import bcrypt from 'bcrypt'
 import * as jwt from 'jsonwebtoken'
 import { authMiddleware } from 'middleware'
@@ -34,6 +34,12 @@ export class AuthController implements IController {
                path: '/change-password',
                handler: this.changePassword,
                method: "PUT"
+          })
+
+          this.routes.push({
+               path: '/verify-reset-token',
+               handler: this.resetTokenVerify,
+               method: 'GET'
           })
 
      }
@@ -114,7 +120,6 @@ export class AuthController implements IController {
                email: email
           }, 'jsonwebtoken', { expiresIn: '900s' })
 
-
           await Users.updateOne({ email }, { $set: { resetToken: token } })
           let transporter = await nodemailer.createTransport({
                host: 'smtp.gmail.com',
@@ -174,6 +179,19 @@ export class AuthController implements IController {
                }
           })
           return Ok(res, "your password have been changed, now login and try your account")
+
+     }
+
+     public async resetTokenVerify(req: Request, res: Response) {
+          const token = req.query.token as string
+          const user = await Users.findOne({ resetToken: token })
+          let tokenValid = false;
+          if (user) {
+               tokenValid = true
+          }
+          console.log(user, token)
+
+          return Ok(res, { success: tokenValid });
 
      }
 
