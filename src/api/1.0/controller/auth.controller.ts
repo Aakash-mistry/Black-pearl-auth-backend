@@ -1,7 +1,7 @@
 import { Request, Response } from 'express'
 import { IControllerRoutes, IController, ResetTokenInfo } from 'types'
-import { BadRequest, NotFound, Ok, UnAuthorized } from 'utils'
-import { CallbackModel, Users } from 'model'
+import { BadRequest, Ok, UnAuthorized } from 'utils'
+import { Users } from 'model'
 import bcrypt from 'bcrypt'
 import * as jwt from 'jsonwebtoken'
 import { authMiddleware } from 'middleware'
@@ -39,6 +39,12 @@ export class AuthController implements IController {
           this.routes.push({
                path: '/verify-reset-token',
                handler: this.resetTokenVerify,
+               method: 'GET'
+          })
+
+          this.routes.push({
+               path: '/verify-token',
+               handler: this.verifyingToken,
                method: 'GET'
           })
 
@@ -195,4 +201,15 @@ export class AuthController implements IController {
 
      }
 
+     public async verifyingToken(req: Request, res: Response) {
+          const token = req.query.token as string
+          if (token) {
+               const success = await jwt.verify(token, 'jsonwebtoken')
+               if (success) {
+                    return Ok(res, "Token verified")
+               } {
+                    return UnAuthorized(res, 'Invalid token')
+               }
+          }
+     }
 }
